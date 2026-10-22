@@ -23,6 +23,7 @@ src/
   test/java/BB84SimulatorTest.java  Dependency-free regression test runner
 bb84_experiment_runs.csv       Per-run experiment data
 test_journal.csv              Expected and observed results for the automated checks
+BB84_Project_Report.docx       Three-page project report with methods, results, and limitations
 visualize_results.py           Builds grouped statistics and PNG plots
 bb84_graphs/                   Generated plots and grouped summary CSV
 ```
@@ -70,7 +71,7 @@ javac -d out \
 java -cp out BB84SimulatorTest
 ```
 
-The runner currently contains 18 checks for input validation, probability boundaries, repeatable traces, sifting, test sample rounding, candidate exclusion, ideal-channel QBER, certain-noise QBER, and insufficient data. The matching scenarios, expected results, observed results, and statuses are recorded in `test_journal.csv`. The runner prints one PASS line per check and exits with an error if a check fails. The tests use only the JDK and do not require JUnit.
+The runner currently contains 18 checks for input validation, probability boundaries, repeatable traces, sifting, test sample rounding, candidate exclusion, ideal-channel QBER, certain-noise QBER, and insufficient data. Each run writes or replaces `test_journal.csv` in the current directory with the scenarios, expected results, observed results, and statuses. The runner prints one PASS line per check and exits with an error if a check fails. The tests use only the JDK and do not require JUnit.
 
 ## Regenerate graphs and summary
 
@@ -126,4 +127,4 @@ The CSV's `DurationNs` is the elapsed time for one simulator call, not a separat
 
 ## Current project scope
 
-The current source implements the command-line simulator, batch experiment workflow, dependency-free automated checks, and a test journal. It does not yet include a graphical interface, written project report, or presentation. These should be completed and documented separately for the exam submission.
+The current source implements the command-line simulator, batch experiment workflow, dependency-free automated checks, a test journal, and a three-page project report. It does not yet include a graphical interface or presentation. These should be completed separately for the exam submission.

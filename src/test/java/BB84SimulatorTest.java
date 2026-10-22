@@ -3,12 +3,19 @@ import simulation.BitTrace;
 import simulation.SimulationConfig;
 import simulation.SimulationResult;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Dependency-free regression checks for the BB84 simulator. */
 public final class BB84SimulatorTest {
 
     private static int passed;
+    private static final List<String[]> journalRows = new ArrayList<>();
 
     private BB84SimulatorTest() { }
 
@@ -40,6 +47,7 @@ public final class BB84SimulatorTest {
         run("empty sifted set returns insufficient_data and NaN QBER", BB84SimulatorTest::testEmptySiftedSet);
         run("null configuration is rejected", BB84SimulatorTest::testNullConfiguration);
 
+        writeJournal();
         System.out.println("PASS: " + passed + " tests");
     }
 
@@ -175,10 +183,81 @@ public final class BB84SimulatorTest {
         try {
             test.run();
             passed++;
+            journalRows.add(new String[]{name, expectedResult(name), "All test assertions passed.", "PASS"});
+            writeJournal();
             System.out.println("PASS: " + name);
         } catch (Throwable failure) {
+            journalRows.add(new String[]{name, expectedResult(name),
+                    "Assertion failed: " + String.valueOf(failure.getMessage()), "FAIL"});
+            writeJournal();
             System.err.println("FAIL: " + name + " - " + failure.getMessage());
             throw failure;
         }
+    }
+
+    private static String expectedResult(String name) {
+        switch (name) {
+            case "rejects zero transmissions":
+                return "N=0 is rejected with IllegalArgumentException.";
+            case "rejects negative transmissions":
+                return "Negative N is rejected with IllegalArgumentException.";
+            case "rejects Eve probability below zero":
+                return "Eve probability below 0 is rejected.";
+            case "rejects Eve probability above one":
+                return "Eve probability above 1 is rejected.";
+            case "rejects NaN Eve probability":
+                return "NaN Eve probability is rejected.";
+            case "rejects noise probability below zero":
+                return "Noise probability below 0 is rejected.";
+            case "rejects noise probability above one":
+                return "Noise probability above 1 is rejected.";
+            case "rejects NaN noise probability":
+                return "NaN noise probability is rejected.";
+            case "accepts probability boundary values":
+                return "Probability values 0 and 1 are accepted.";
+            case "same configuration and seed reproduce trace":
+                return "Same seed and configuration produce identical traces and summaries.";
+            case "trace contains one record per transmission":
+                return "Trace length equals N (123 entries).";
+            case "only equal-basis positions are sifted":
+                return "Only matched-basis positions are sifted; mismatches are neither test nor candidate bits.";
+            case "no Eve and no noise gives zero QBER":
+                return "A nonempty test sample has zero errors and QBER 0%.";
+            case "test sample size is rounded upward":
+                return "Test sample size equals ceil(20% of sifted bits).";
+            case "test positions are excluded from candidate material":
+                return "Test positions are excluded and candidate positions are sifted and untested.";
+            case "noise probability one gives 100 percent QBER":
+                return "Every test bit is wrong, QBER is 100%, and decision is reject.";
+            case "empty sifted set returns insufficient_data and NaN QBER":
+                return "An empty sifted set yields insufficient_data, zero test bits, and NaN QBER.";
+            case "null configuration is rejected":
+                return "Null configuration is rejected with IllegalArgumentException.";
+            default:
+                return "All assertions defined for this scenario pass.";
+        }
+    }
+
+    private static void writeJournal() {
+        Path path = Path.of("test_journal.csv");
+        try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+            writer.write("test_id,scenario,expected_result,actual_result,status");
+            writer.newLine();
+            for (int i = 0; i < journalRows.size(); i++) {
+                String[] row = journalRows.get(i);
+                writer.write(csv("T" + String.format("%02d", i + 1)));
+                for (String value : row) {
+                    writer.write(",");
+                    writer.write(csv(value));
+                }
+                writer.newLine();
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not write test_journal.csv", exception);
+        }
+    }
+
+    private static String csv(String value) {
+        return "\"" + value.replace("\"", "\"\"") + "\"";
     }
 }
