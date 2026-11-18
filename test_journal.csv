@@ -17,3 +17,6 @@ test_id,scenario,expected_result,actual_result,status
 "T16","noise probability one gives 100 percent QBER","Every test bit is wrong, QBER is 100%, and decision is reject.","All test assertions passed.","PASS"
 "T17","empty sifted set returns insufficient_data and NaN QBER","An empty sifted set yields insufficient_data, zero test bits, and NaN QBER.","All test assertions passed.","PASS"
 "T18","null configuration is rejected","Null configuration is rejected with IllegalArgumentException.","All test assertions passed.","PASS"
+"T19","all matched ideal bits agree","Every equal-basis position has equal Alice and Bob bits without Eve or noise.","All test assertions passed.","PASS"
+"T20","one tested bit with full noise rejects","One test bit at 100% QBER gives reject, even when no candidate bits remain.","All test assertions passed.","PASS"
+"T21","undefined QBER exports as N/A","The CSV exporter writes N/A for an undefined test QBER.","All test assertions passed.","PASS"

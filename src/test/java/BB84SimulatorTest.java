@@ -47,6 +47,32 @@ public final class BB84SimulatorTest {
         run("empty sifted set returns insufficient_data and NaN QBER", BB84SimulatorTest::testEmptySiftedSet);
         run("null configuration is rejected", BB84SimulatorTest::testNullConfiguration);
 
+        run("all matched ideal bits agree", () -> {
+            for (BitTrace bit : run(1000, 0, 0, 12).getTrace()) {
+                check(!bit.isBasesMatched() || !bit.isError(), "matched ideal bit differs");
+            }
+        });
+        run("one tested bit with full noise rejects", () -> {
+            SimulationResult result = run(1, 0, 1, 0);
+            check(result.getNTest() == 1, "expected one test bit");
+            check(result.getQberPercent() == 100, "expected QBER 100");
+            check("reject".equals(result.getDecision()), "high QBER must reject even with no candidates");
+        });
+        run("undefined QBER exports as N/A", () -> {
+            try {
+                SimulationResult empty = null;
+                for (long seed = 0; seed < 10000; seed++) {
+                    SimulationResult current = run(1, 0, 0, seed);
+                    if (current.getNTest() == 0) { empty = current; break; }
+                }
+                check(empty != null, "empty example not found");
+                Path temp = Files.createTempFile("bb84-export-", ".csv");
+                new experiments.CsvExporter().exportRuns(java.util.Collections.singletonList(
+                    new experiments.ExperimentRunRecord(1, 0, 0, 1, 0, empty, 0)), temp.toString());
+                check(Files.readString(temp).contains(",N/A,"), "CSV does not contain N/A");
+                Files.delete(temp);
+            } catch (IOException exception) { throw new IllegalStateException(exception); }
+        });
         writeJournal();
         System.out.println("PASS: " + passed + " tests");
     }
@@ -233,6 +259,12 @@ public final class BB84SimulatorTest {
                 return "An empty sifted set yields insufficient_data, zero test bits, and NaN QBER.";
             case "null configuration is rejected":
                 return "Null configuration is rejected with IllegalArgumentException.";
+            case "all matched ideal bits agree":
+                return "Every equal-basis position has equal Alice and Bob bits without Eve or noise.";
+            case "one tested bit with full noise rejects":
+                return "One test bit at 100% QBER gives reject, even when no candidate bits remain.";
+            case "undefined QBER exports as N/A":
+                return "The CSV exporter writes N/A for an undefined test QBER.";
             default:
                 return "All assertions defined for this scenario pass.";
         }

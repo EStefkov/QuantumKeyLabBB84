@@ -32,7 +32,7 @@ public class CsvExporter {
                 writer.write(String.format(
                         java.util.Locale.US,
                         "%d,%.2f,%.2f,%d,%d,%d,%.4f,"
-                                + "%d,%d,%.4f,%d,%s,%d",
+                                + "%d,%d,%s,%d,%s,%s",
                         record.getNSent(),
                         record.getEveProbability(),
                         record.getNoiseProbability(),
@@ -42,10 +42,11 @@ public class CsvExporter {
                         record.getSiftedPercent(),
                         record.getNTest(),
                         record.getTestErrors(),
-                        record.getQberPercent(),
+                        Double.isFinite(record.getQberPercent())
+                                ? String.format(java.util.Locale.US, "%.4f", record.getQberPercent()) : "N/A",
                         record.getCandidateBits(),
                         record.getDecision(),
-                        record.getDurationNs()
+                        record.getDurationNs() > 0 ? Long.toString(record.getDurationNs()) : "N/A"
                 ));
                 writer.newLine();
             }

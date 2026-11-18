@@ -5,6 +5,13 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
 
+        if (args.length == 0) {
+            javax.swing.SwingUtilities.invokeLater(() -> new ui.QuantumKeyLab().setVisible(true));
+            return;
+        }
+        if (!"--batch".equals(args[0])) {
+            throw new IllegalArgumentException("Usage: Main [--batch]");
+        }
         ExperimentRunner runner = new ExperimentRunner();
 
         runner.runAll();

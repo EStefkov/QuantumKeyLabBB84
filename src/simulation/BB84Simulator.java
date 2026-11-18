@@ -27,9 +27,6 @@ public class BB84Simulator {
         double eveProbability = config.getEveProbability();
         double noiseProbability = config.getNoiseProbability();
 
-        List<Integer> aliceSiftedBits = new ArrayList<>();
-        List<Integer> bobSiftedBits = new ArrayList<>();
-
         // Записи за всички изпратени състояния
         List<BitTrace> trace = new ArrayList<>();
 
@@ -90,13 +87,11 @@ public class BB84Simulator {
 
             // Пресяваме само състоянията с еднакви базиси
             if (basesMatched) {
-                aliceSiftedBits.add(aliceBit);
-                bobSiftedBits.add(bobBit);
                 siftedIndexes.add(i);
             }
         }
 
-        int nSifted = aliceSiftedBits.size();
+        int nSifted = siftedIndexes.size();
 
         double siftedPercent =
                 (double) nSifted / nSent * 100.0;
@@ -120,8 +115,6 @@ public class BB84Simulator {
 
         Collections.shuffle(shuffledIndexes, random);
 
-        boolean[] selectedForTest = new boolean[nSent];
-
         int testErrors = 0;
 
         for (int i = 0; i < nTest; i++) {
@@ -129,11 +122,9 @@ public class BB84Simulator {
             int siftedPosition = shuffledIndexes.get(i);
             int originalIndex = siftedIndexes.get(siftedPosition);
 
-            selectedForTest[originalIndex] = true;
             trace.get(originalIndex).setSelectedForTest(true);
 
-            if (!aliceSiftedBits.get(siftedPosition)
-                    .equals(bobSiftedBits.get(siftedPosition))) {
+            if (trace.get(originalIndex).isError()) {
                 testErrors++;
             }
         }
@@ -146,10 +137,6 @@ public class BB84Simulator {
             }
         }
 
-        // Отбелязваме тестовите позиции в подробния запис
-        // Тук избраните позиции вече са известни.
-        // BitTrace засега пази основните данни за всяко състояние.
-
         double qberPercent =
                 (double) testErrors / nTest * 100.0;
 
@@ -157,7 +144,7 @@ public class BB84Simulator {
 
         String decision;
 
-        if (nTest == 0 || candidateBits <= 0) {
+        if (nTest == 0) {
             decision = "insufficient_data";
         } else if (qberPercent > QBER_THRESHOLD_PERCENT) {
             decision = "reject";

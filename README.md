@@ -1,130 +1,113 @@
-# Quantum Key Lab: BB84 Simulation
+# Quantum Key Lab — BB84
 
-A Java teaching simulator for the BB84 quantum key distribution protocol. It models Alice, Bob, optional intercept-and-resend eavesdropping by Eve, basis sifting, a public test sample, QBER evaluation, and repeated parameter experiments.
+Учебен Java симулатор с Alice, Bob и intercept-resend подслушване от Eve.
+Интерфейсът е на български и използва Swing. Не се предават реални фотони.
 
-> This is an educational simulation of BB84 measurement rules. It does not send photons or implement a production cryptographic protocol.
+## Изисквания и стартиране
 
-## Requirements
+Нужен е **JDK 11 или по-нов**. Няма външни Java библиотеки.
 
-- Java Development Kit (JDK) 11 or newer
-- Python 3.9 or newer to regenerate the plots
-- Python packages `pandas` and `matplotlib` to regenerate the plots
+- macOS: двоен клик върху `start.command` или `./start.command` в Terminal.
+- Windows: `start.bat`.
+- Linux: `sh start.command`.
+- IntelliJ: стартирайте `src/Main.java` без аргументи.
+- Само пакетни експерименти: `./start.command --batch`.
 
-The Java simulator has no third-party Java dependencies. The repository does not currently pin Python package versions.
+Последната команда заменя `bb84_experiment_runs.csv` в текущата папка.
+Графичният интерфейс експортира в избрана папка и пита преди замяна на файлове.
 
-## Project layout
+## Сорс и компилация
 
-```text
-src/
-  Main.java                    Runs the batch experiment and exports its run records
-  quantum/QuantumState.java    Four BB84 states in the Z and X bases
-  simulation/                  Configuration, simulator, result, and bit trace
-  experiments/                 Batch experiments, summaries, and CSV export
-  test/java/BB84SimulatorTest.java  Dependency-free regression test runner
-bb84_experiment_runs.csv       Per-run experiment data
-test_journal.csv              Expected and observed results for the automated checks
-BB84_Project_Report.docx       Three-page project report with methods, results, and limitations
-visualize_results.py           Builds grouped statistics and PNG plots
-bb84_graphs/                   Generated plots and grouped summary CSV
+`src/` съдържа Java сорса. `out/` съдържа генерираните `.class` файлове;
+те не са копия на сорса, които трябва да се редактират.
+
+IntelliJ и стартиращите скриптове използват една папка: **`out/classes`**.
+Скриптовете премахват предишните `.class` файлове в нея преди компилация,
+за да не остават стари вътрешни или преименувани класове.
+Не изпълнявайте едновременно IDE build и стартовия скрипт.
+`out/` не се включва във финалния ZIP или Git.
+
+Ръчна компилация от корена на проекта (macOS/Linux):
+
+```sh
+mkdir -p out/classes
+find src -name '*.java' -print > out/sources.txt
+javac --release 11 -encoding UTF-8 -d out/classes @out/sources.txt
+java -cp out/classes Main
 ```
 
-## Compile and run the experiments
+## Работа с интерфейса
 
-Run these commands from the project root directory:
+1. Задайте N, f, noise и целочислен seed. За учебния изглед използвайте N=20.
+2. „Стъпка“ разкрива последователно изпращане, измерване, пресяване, извадка
+   и оценка от един изчислен trace. „Изпълни симулация“ показва крайния резултат.
+3. Цветната таблица отличава съвпадналите базиси, тестовите позиции и грешките.
+   Показват се QBER, кандидат-дължина и остатъчни грешки само за симулатора.
+4. Готовите гранични примери показват шум=1 и празна извадка. Невалидните входове
+   се отхвърлят с ясно съобщение. Промяна на параметър изчиства стария резултат.
+5. В раздел „Експерименти“ стартирайте 3600 серии и експортирайте резултатите.
+6. В раздел „Проверки и помощ“ стартирайте основните тестове; показва се пътят
+   до временния журнал. За журнал в проекта използвайте командата по-долу.
 
-```bash
-mkdir -p out
-javac -d out \
-  src/quantum/QuantumState.java \
-  src/simulation/SimulationConfig.java \
-  src/simulation/SimulationResult.java \
-  src/simulation/BitTrace.java \
-  src/simulation/BB84Simulator.java \
-  src/experiments/ExperimentRunRecord.java \
-  src/experiments/ExperimentSummary.java \
-  src/experiments/ExperimentRunner.java \
-  src/experiments/CsvExporter.java \
-  src/Main.java
-java -cp out Main
+Интерфейсът допуска N до 100000. Таблицата показва най-много 5000 позиции,
+но симулацията и trace експортът запазват всички позиции.
+Настройките могат да се записват и зареждат като Java Properties;
+пример: `demo/bb84_config.properties`.
+
+## Протокол и измервания
+
+Alice и Bob избират независимо битове/базиси Z/X. При измерване в различен
+базис резултатът е случаен. Eve прихваща с вероятност f, измерва в случаен базис
+и изпраща ново състояние. Шумът обръща независимо измерения бит на Bob.
+Остават само еднаквите базиси; случайни ceil(20%) от тях се отделят за тест
+и се изключват от кандидат-материала.
+
+QBER = грешки в теста / тестови битове × 100. При QBER > 8% решението е reject;
+при липса на тестова извадка е insufficient_data и QBER е N/A.
+Кандидат-дължина = пресети битове − тестови битове.
+
+Планът в `ExperimentPlan` задава N={200,1000,5000}, f={0,0.25,0.5,1},
+noise={0,0.01,0.03}; 100 загряващи и 100 измерени извиквания на комбинация.
+Всеки измерен run има записан различен seed. Използва се System.nanoTime.
+Средни стойности, извадково SD (n−1), засичане, фалшив отказ и категории
+се изчисляват на едно място — `ExperimentSummary` — за UI, конзолата и CSV.
+`ExperimentChart` визуализира същите обобщения, без повторно изчисляване.
+
+## Експорт
+
+- Единичен опит: `run_summary.csv`, `bit_trace.csv`, `bb84_config.properties`,
+  `environment.txt`. Неизмереното време е N/A.
+- Серии: `bb84_experiment_runs.csv`, обобщен `run_summary.csv`, `environment.txt`
+  и три PNG: QBER, процент откази и дял пресети битове.
+- CSV съдържа N, f, noise, seed, пресети/тестови битове, грешки, QBER,
+  кандидат-дължина, решение и време. Обобщението добавя средни/SD и отделни
+  detection/false-reject показатели за всяка комбинация и ниво на шум.
+- Допълнете точния модел CPU и физическата RAM в environment.txt.
+
+## Проверки
+
+След компилация:
+
+```sh
+java -cp out/classes BB84SimulatorTest
+java -cp out/classes ExperimentSummaryTest
+java -cp out/classes BB84DesktopTest
 ```
 
-The batch runner performs 100 runs for each combination of:
+Първата команда изпълнява 21 проверки и записва `test_journal.csv`.
+Втората проверява общите статистики и съответствието с CSV върху известни примери.
+Третата изисква графична среда и проверява етапите, промяна на настройки,
+3600 серии, графиките, граничните примери и стартирането на тестовете от UI.
 
-- Transmissions `N`: 200, 1000, 5000
-- Eve interception probability `f`: 0, 0.25, 0.5, 1
-- Independent Bob bit-flip noise: 0, 0.01, 0.03
+## Допълнителни материали и ограничения
 
-That produces 36 combinations and 3,600 runs. Each run uses a distinct seed. Running `Main` writes or replaces `bb84_experiment_runs.csv` in the current directory and prints combination-level statistics to the terminal.
+`visualize_results.py` е незадължителна алтернатива за графиките; изисква pandas
+с поддръжка на `include_groups` (2.2+) и matplotlib. Ако я използвате за окончателните
+измервания, запишете точните версии на Python и библиотеките. Java UI не изисква Python.
 
-## Run the automated checks
+Seeded java.util.Random е само за възпроизводим учебен режим. Няма съгласуване
+на грешки, privacy amplification или автентичен класически канал. Кандидат-битовете
+не са доказано сигурен краен ключ; при отказ материалът не е използваем ключ.
 
-Compile the simulator and test runner, then run the test class:
-
-```bash
-javac -d out \
-  src/quantum/QuantumState.java \
-  src/simulation/SimulationConfig.java \
-  src/simulation/SimulationResult.java \
-  src/simulation/BitTrace.java \
-  src/simulation/BB84Simulator.java \
-  src/test/java/BB84SimulatorTest.java
-java -cp out BB84SimulatorTest
-```
-
-The runner currently contains 18 checks for input validation, probability boundaries, repeatable traces, sifting, test sample rounding, candidate exclusion, ideal-channel QBER, certain-noise QBER, and insufficient data. Each run writes or replaces `test_journal.csv` in the current directory with the scenarios, expected results, observed results, and statuses. The runner prints one PASS line per check and exits with an error if a check fails. The tests use only the JDK and do not require JUnit.
-
-## Regenerate graphs and summary
-
-Install the plotting dependencies if needed:
-
-```bash
-python3 -m pip install pandas matplotlib
-```
-
-Then, from the project root:
-
-```bash
-python3 visualize_results.py
-```
-
-The script reads `bb84_experiment_runs.csv` and writes `bb84_graphs/bb84_summary.csv` plus three PNGs: mean QBER by Eve probability and noise, rejection rate by Eve probability, and mean execution time by transmission size. Execution time is measured per simulation run with Java's monotonic `System.nanoTime()` timer; the graph summarizes those recorded run times.
-
-## Model and calculations
-
-1. Alice independently chooses a random bit and a random Z or X basis for each transmission.
-2. Eve intercepts each state with probability `f`. If she intercepts, she chooses a random basis, measures, and prepares a new state from her result and basis.
-3. Bob chooses a random basis and measures. If his basis differs from the prepared state's basis, the result is an independent random bit.
-4. The configured noise probability independently flips Bob's measured bit.
-5. Alice and Bob keep positions where their bases match. The simulator randomly selects `ceil(20% of sifted bits)` as a test sample and compares those bits.
-6. `QBER (%) = test errors / test sample size * 100`. The educational rule rejects a run when QBER is greater than 8%. Empty sifted material is marked `insufficient_data`; the result stores QBER as `NaN` when no test sample can be measured. The current CSV exporter writes this as `NaN`; the exam brief asks for non-applicable values to be labeled `N/A`.
-7. Candidate material is `sifted bits - test bits`. Test bits are excluded from candidate positions in the detailed trace.
-
-The CSV's `DurationNs` is the elapsed time for one simulator call, not a separately warmed-up benchmark. Use care when interpreting short-run timings.
-
-## Output fields
-
-`bb84_experiment_runs.csv` contains one row per run:
-
-| Column | Meaning |
-| --- | --- |
-| `N` | Number of simulated transmissions |
-| `EveProbability` | Probability that Eve intercepts a transmission |
-| `NoiseProbability` | Probability of a Bob bit flip from the noise model |
-| `RunNumber`, `Seed` | Run index within the combination and its reproducibility seed |
-| `SiftedBits`, `SiftedPercent` | Count and percentage of matched-basis positions |
-| `TestBits`, `TestErrors`, `QBERPercent` | Test sample size, observed errors, and QBER |
-| `CandidateBits` | Sifted bits remaining after removing the test sample |
-| `Decision` | `accept`, `reject`, or `insufficient_data` under the educational rule |
-| `DurationNs` | Elapsed nanoseconds for the simulation call |
-
-## Security and interpretation limits
-
-- This model is for learning and does not prove security of a key.
-- Candidate bits are not a finished key: the implementation does not perform error correction, privacy amplification, or authentication of the classical channel.
-- The independent bit-flip noise model is simplified and does not represent every physical channel effect.
-- A low QBER in a small test sample is not a precise estimate of the channel error rate.
-- Seeds make the educational simulations repeatable; the seeded `java.util.Random` generator is not suitable for cryptographic secrets or secure key generation.
-
-## Current project scope
-
-The current source implements the command-line simulator, batch experiment workflow, dependency-free automated checks, a test journal, and a three-page project report. It does not yet include a graphical interface or presentation. These should be completed separately for the exam submission.
+Съществуващите DOCX/PPTX трябва да се синхронизират с избрания окончателен CSV
+и новия интерфейс. Подробна проверка: `REQUIREMENTS_REVIEW_BG.md`.

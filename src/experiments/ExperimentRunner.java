@@ -7,25 +7,12 @@ import simulation.SimulationResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 
 public class ExperimentRunner {
 
     private final List<ExperimentRunRecord> runRecords =
             new ArrayList<>();
-
-    private static final int[] SIZES = {
-            200, 1000, 5000
-    };
-
-    private static final double[] EVE_PROBABILITIES = {
-            0.0, 0.25, 0.5, 1.0
-    };
-
-    private static final double[] NOISE_PROBABILITIES = {
-            0.0, 0.01, 0.03
-    };
-
-    private static final int RUNS_PER_COMBINATION = 100;
 
     public List<ExperimentRunRecord> getRunRecords() {
         return new ArrayList<>(runRecords);
@@ -38,25 +25,25 @@ public class ExperimentRunner {
         List<ExperimentSummary> summaries = new ArrayList<>();
         BB84Simulator simulator = new BB84Simulator();
 
-        long seed = 20261015L;
+        long seed =  new Random().nextLong();
         long totalStart = System.nanoTime();
 
         printHeader();
 
-        for (int n : SIZES) {
-            for (double eve : EVE_PROBABILITIES) {
-                for (double noise : NOISE_PROBABILITIES) {
+        for (int n : ExperimentPlan.sizes()) {
+            for (double eve : ExperimentPlan.eveProbabilities()) {
+                for (double noise : ExperimentPlan.noiseProbabilities()) {
 
+                    // Equal warm-up work for every configuration, excluded from measurements.
+                    for (int warm = 0; warm < ExperimentPlan.WARMUP_RUNS; warm++) {
+                        simulator.run(new SimulationConfig(n, eve, noise, seed++));
+                    }
                     long combinationStart = System.nanoTime();
 
-                    List<Double> qberValues = new ArrayList<>();
-
-                    int accepted = 0;
-                    int rejected = 0;
-                    int insufficient = 0;
+                    int groupStart = runRecords.size();
 
                     for (int run = 0;
-                         run < RUNS_PER_COMBINATION;
+                         run < ExperimentPlan.RUNS_PER_COMBINATION;
                          run++) {
 
                         long currentSeed = seed++;
@@ -85,77 +72,13 @@ public class ExperimentRunner {
                                 runDurationNs
                         ));
 
-                        String decision = result.getDecision();
-
-                        if ("accept".equalsIgnoreCase(decision)) {
-                            accepted++;
-                        } else if ("reject".equalsIgnoreCase(decision)) {
-                            rejected++;
-                        } else if ("insufficient_data".equalsIgnoreCase(decision)) {
-                            insufficient++;
-                        }
-
-                        if (Double.isFinite(result.getQberPercent())) {
-                            qberValues.add(result.getQberPercent());
-                        }
                     }
 
-                    double averageQber =
-                            calculateAverage(qberValues);
+                    ExperimentSummary summary = ExperimentSummary.summarize(
+                            runRecords.subList(groupStart, runRecords.size())).get(0);
+                    summaries.add(summary);
+                    printResult(summary, (System.nanoTime() - combinationStart) / 1_000_000);
 
-                    double standardDeviation =
-                            calculateStandardDeviation(
-                                    qberValues,
-                                    averageQber
-                            );
-
-                    double acceptRate =
-                            percentage(accepted, RUNS_PER_COMBINATION);
-
-                    double rejectRate =
-                            percentage(rejected, RUNS_PER_COMBINATION);
-
-                    double insufficientRate =
-                            percentage(insufficient, RUNS_PER_COMBINATION);
-
-                    double detectionRate = eve > 0.0
-                            ? rejectRate
-                            : Double.NaN;
-
-                    double falseRejectionRate = eve == 0.0
-                            ? rejectRate
-                            : Double.NaN;
-
-                    long durationMs =
-                            (System.nanoTime() - combinationStart)
-                                    / 1_000_000;
-
-                    summaries.add(new ExperimentSummary(
-                            n,
-                            eve,
-                            noise,
-                            RUNS_PER_COMBINATION,
-                            averageQber,
-                            standardDeviation,
-                            rejectRate,
-                            insufficientRate,
-                            detectionRate,
-                            falseRejectionRate,
-                            durationMs
-                    ));
-
-                    printResult(
-                            n,
-                            eve,
-                            noise,
-                            averageQber,
-                            standardDeviation,
-                            acceptRate,
-                            rejectRate,
-                            insufficientRate,
-                            detectionRate,
-                            durationMs
-                    );
                 }
             }
         }
@@ -197,32 +120,14 @@ public class ExperimentRunner {
         );
     }
 
-    private void printResult(
-            int n,
-            double eve,
-            double noise,
-            double averageQber,
-            double standardDeviation,
-            double acceptRate,
-            double rejectRate,
-            double insufficientRate,
-            double detectionRate,
-            long durationMs
-    ) {
-
+    private void printResult(ExperimentSummary summary, long durationMs) {
         System.out.printf(
                 Locale.US,
                 "%-7d %-6.2f %-7.2f %-11s %-10s %-10s %-10s %-12s %-10d%n",
-                n,
-                eve,
-                noise,
-                formatPercent(averageQber),
-                formatPercent(standardDeviation),
-                formatPercent(acceptRate),
-                formatPercent(rejectRate),
-                formatPercent(insufficientRate),
-                durationMs
-        );
+                summary.getNSent(), summary.getEveProbability(), summary.getNoiseProbability(),
+                formatPercent(summary.getAverageQber()), formatPercent(summary.getStandardDeviation()),
+                formatPercent(summary.getAcceptRate()), formatPercent(summary.getRejectRate()),
+                formatPercent(summary.getInsufficientRate()), durationMs);
     }
 
     private void printSummary(
@@ -253,49 +158,6 @@ public class ExperimentRunner {
         );
 
         System.out.println("==========================================================================");
-    }
-
-    private double calculateAverage(List<Double> values) {
-
-        if (values.isEmpty()) {
-            return Double.NaN;
-        }
-
-        double sum = 0.0;
-
-        for (double value : values) {
-            sum += value;
-        }
-
-        return sum / values.size();
-    }
-
-    private double calculateStandardDeviation(
-            List<Double> values,
-            double average
-    ) {
-
-        if (values.size() < 2) {
-            return Double.NaN;
-        }
-
-        double sumSquaredDifferences = 0.0;
-
-        for (double value : values) {
-            double difference = value - average;
-            sumSquaredDifferences += difference * difference;
-        }
-
-        // Извадково стандартно отклонение.
-        return Math.sqrt(
-                sumSquaredDifferences / (values.size() - 1)
-        );
-    }
-
-    private double percentage(int count, int total) {
-        return total == 0
-                ? 0.0
-                : (double) count / total * 100.0;
     }
 
     private String formatPercent(double value) {
